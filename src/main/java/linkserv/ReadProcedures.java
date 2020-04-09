@@ -3,8 +3,10 @@ package linkserv;
 import models.OutlinkNode;
 import models.RootNode;
 import org.neo4j.graphdb.GraphDatabaseService;
+import org.neo4j.graphdb.Result;
 import org.neo4j.procedure.*;
 import constants.Constants;
+import java.util.ArrayList;
 import java.util.stream.Stream;
 
 public class ReadProcedures {
@@ -14,6 +16,7 @@ public class ReadProcedures {
 
     @Procedure(value = "linkserv.getRootNode", mode = Mode.READ)
     public Stream<RootNode> getRootNode(@Name("url") String url, @Name("timestamp") String timestamp) {
+        ArrayList<RootNode> rootNodes = new ArrayList<>();
 
         String[] queryFragments = new String[]{"MATCH (parent:", Constants.parentNodeLabel, ")-[:", Constants.versionRelationshipType, "]->(v:",
                 Constants.versionNodeLabel, "{", Constants.versionProperty, ":\"", timestamp, "\"}) WHERE parent.", Constants.nameProperty,
@@ -25,15 +28,18 @@ public class ReadProcedures {
         for (String fragment : queryFragments) {
             queryBuilder.append(fragment);
         }
-
         query = queryBuilder.toString();
 
-        return db.execute(query).stream().map(RootNode::new);
+        Result result = db.beginTx().execute(query);
+        while(result.hasNext()){
+            rootNodes.add(new RootNode(result.next()));
+        }
+        return rootNodes.stream();
     }
 
     @Procedure(value = "linkserv.getOutlinkNodes", mode = Mode.READ)
     public Stream<OutlinkNode> getOutlinkNodes(@Name("nodeName") String nodeName, @Name("timestamp") String nodeVersion) {
-
+        ArrayList<OutlinkNode> outlinkNodes = new ArrayList<>();
         String[] queryFragments = new String[]{"MATCH (parent1:", Constants.parentNodeLabel, " {", Constants.nameProperty, ": \"", nodeName,
                 "\"})-[:", Constants.versionRelationshipType, "]->(version1:", Constants.versionNodeLabel, " {", Constants.versionProperty, ": \"",
                 nodeVersion, "\"})-[r:", Constants.linkRelationshipType, "]->(parent2:", Constants.parentNodeLabel,
@@ -49,6 +55,10 @@ public class ReadProcedures {
         }
         query = queryBuilder.toString();
 
-        return db.execute(query).stream().map(OutlinkNode::new);
+        Result result = db.beginTx().execute(query);
+        while(result.hasNext()){
+            outlinkNodes.add(new OutlinkNode(result.next()));
+        }
+        return outlinkNodes.stream();
     }
 }

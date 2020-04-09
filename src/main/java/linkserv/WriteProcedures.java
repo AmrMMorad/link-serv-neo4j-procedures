@@ -2,12 +2,12 @@ package linkserv;
 
 import models.Output;
 import org.neo4j.graphdb.GraphDatabaseService;
+import org.neo4j.graphdb.Result;
 import org.neo4j.procedure.Context;
 import org.neo4j.procedure.Mode;
 import org.neo4j.procedure.Name;
 import org.neo4j.procedure.Procedure;
 import constants.Constants;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -20,9 +20,9 @@ public class WriteProcedures {
 
     @Procedure(value = "linkserv.addNodesAndRelationships", mode = Mode.WRITE)
     public Stream<Output> addNodesAndRelationships(@Name("url") String url, @Name("timestamp") String timestamp, @Name("outlinks") List outlinks){
-
-        StringBuilder queryBuilder = new StringBuilder("");
+        ArrayList<Output> outputs = new ArrayList<>();
         ArrayList<String> queryFragments = new ArrayList<>();
+        StringBuilder queryBuilder = new StringBuilder("");
         String query;
 
         // Create the ParentNode with its version
@@ -45,6 +45,11 @@ public class WriteProcedures {
         queryBuilder.append("RETURN parent." + Constants.nameProperty + ";");
 
         query = queryBuilder.toString();
-        return db.execute(query).stream().map(Output::new);
+        db.executeTransactionally(query);
+        Result result = db.beginTx().execute(query);
+        while(result.hasNext()){
+            outputs.add(new Output(result.next()));
+        }
+        return outputs.stream();
     }
 }

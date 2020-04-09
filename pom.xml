@@ -12,14 +12,14 @@
         <dependency>
             <groupId>org.neo4j</groupId>
             <artifactId>neo4j</artifactId>
-            <version>3.5.12</version>
+            <version>LATEST</version>
             <scope>provided</scope>
         </dependency>
 
         <dependency>
             <groupId>org.neo4j.driver</groupId>
             <artifactId>neo4j-java-driver</artifactId>
-            <version>1.7.5</version>
+            <version>LATEST</version>
             <!--<scope>provided</scope>-->
         </dependency>
 
