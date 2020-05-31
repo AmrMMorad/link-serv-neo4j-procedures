@@ -18,9 +18,10 @@ public class ReadProcedures {
     public Stream<RootNode> getRootNode(@Name("url") String url, @Name("timestamp") String timestamp) {
         ArrayList<RootNode> rootNodes = new ArrayList<>();
 
-        String[] queryFragments = new String[]{"MATCH (parent:", Constants.parentNodeLabel, ")-[:", Constants.versionRelationshipType, "]->(v:",
-                Constants.versionNodeLabel, "{", Constants.versionProperty, ":\"", timestamp, "\"}) WHERE parent.", Constants.nameProperty,
-                " =~ '(?i)", url, "' RETURN parent.", Constants.nameProperty, ", v.", Constants.versionProperty, ", ID(v);"};
+        String[] queryFragments = new String[]{"MATCH (parent:", Constants.parentNodeLabel, "{", Constants.nameProperty,
+                ":\"", url, "\"})-[:", Constants.versionRelationshipType, "]->(v:",
+                Constants.versionNodeLabel, "{", Constants.versionProperty, ":\"", timestamp, "\"}) ",
+                 "RETURN parent.", Constants.nameProperty, ", v.", Constants.versionProperty, ", ID(v);"};
 
         StringBuilder queryBuilder = new StringBuilder("");
         String query;
