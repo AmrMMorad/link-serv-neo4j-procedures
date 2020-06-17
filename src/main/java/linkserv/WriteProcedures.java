@@ -3,14 +3,14 @@ package linkserv;
 import models.Output;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Result;
+import org.neo4j.graphdb.Transaction;
 import org.neo4j.procedure.Context;
 import org.neo4j.procedure.Mode;
 import org.neo4j.procedure.Name;
 import org.neo4j.procedure.Procedure;
 import constants.Constants;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+
+import java.util.*;
 import java.util.stream.Stream;
 
 public class WriteProcedures {
@@ -21,35 +21,41 @@ public class WriteProcedures {
     @Procedure(value = "linkserv.addNodesAndRelationships", mode = Mode.WRITE)
     public Stream<Output> addNodesAndRelationships(@Name("url") String url, @Name("timestamp") String timestamp, @Name("outlinks") List outlinks){
         ArrayList<Output> outputs = new ArrayList<>();
-        ArrayList<String> queryFragments = new ArrayList<>();
         StringBuilder queryBuilder = new StringBuilder("");
         String query;
+        List<String> queryFragmentsList;
 
-        // Create the ParentNode with its version
-        List<String> queryFragmentsList = Arrays.asList("MERGE (parent:", Constants.parentNodeLabel, " {", Constants.nameProperty, ":\"",
-                url, "\"}) MERGE (parent)-[:", Constants.versionRelationshipType, "]->(version:", Constants.versionNodeLabel,
-                " {", Constants.versionProperty, ":\"", timestamp, "\"}) ");
-        queryFragments.addAll(queryFragmentsList);
-
-        // Create relationships with outlinks
-        for (int i = 0; i < outlinks.size(); i++) {
-            queryFragmentsList = Arrays.asList("MERGE (n", String.valueOf(i), ":", Constants.parentNodeLabel, " {", Constants.nameProperty,
-                    ":\"", String.valueOf(outlinks.get(i)), "\"}) ", "MERGE (version)-[:", Constants.linkRelationshipType,
-                    "]->(n", String.valueOf(i), ") ");
-            queryFragments.addAll(queryFragmentsList);
+        if(outlinks.size()!= 0) {
+            List unwindList = Arrays.asList("UNWIND $outlinks as row ");
+            queryFragmentsList = new ArrayList<>(unwindList);
+            queryFragmentsList.addAll(addNodeWithItsVersion(url, timestamp));
+            queryFragmentsList.addAll(Arrays.asList(" MERGE (outlinks:", Constants.parentNodeLabel,
+                    " {", Constants.nameProperty, ":row.url}) MERGE (version)-[:", Constants.linkRelationshipType, "]->(outlinks) "));
+        }
+        else{
+            queryFragmentsList = addNodeWithItsVersion(url, timestamp);
         }
 
-        for (String fragment : queryFragments) {
+        for (String fragment : queryFragmentsList) {
             queryBuilder.append(fragment);
         }
         queryBuilder.append("RETURN parent." + Constants.nameProperty + ";");
 
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("outlinks", outlinks);
         query = queryBuilder.toString();
-        db.executeTransactionally(query);
-        Result result = db.beginTx().execute(query);
+        Transaction tx = db.beginTx();
+        Result result = tx.execute(query, parameters);
+        tx.commit();
         while(result.hasNext()){
             outputs.add(new Output(result.next()));
         }
         return outputs.stream();
+    }
+
+    private List addNodeWithItsVersion(String url, String timestamp){
+        return  Arrays.asList("MERGE (parent:", Constants.parentNodeLabel,
+                " {", Constants.nameProperty, ":\"", url, "\"}) MERGE (version:", Constants.versionNodeLabel, " {", Constants.versionProperty,
+                ":\"", timestamp, "\"}) MERGE (parent)-[:", Constants.versionRelationshipType, "]->(version)");
     }
 }
