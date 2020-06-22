@@ -6,7 +6,10 @@ import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Result;
 import org.neo4j.procedure.*;
 import constants.Constants;
+
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.stream.Stream;
 
 public class ReadProcedures {
@@ -15,27 +18,51 @@ public class ReadProcedures {
     public GraphDatabaseService db;
 
     @Procedure(value = "linkserv.getRootNode", mode = Mode.READ)
-    public Stream<RootNode> getRootNode(@Name("url") String url, @Name("timestamp") String timestamp) {
+    public Stream<RootNode> getRootNode(@Name("url") String url,
+                                        @Name("timestamp") String timestamp) {
+
+        String[] queryFragments = new String[]{"{", Constants.versionProperty, ":\"", timestamp, "\"})"};
+        return buildQueryandExecuteGetRootNodes(url, queryFragments).stream();
+    }
+
+    @Procedure(value = "linkserv.getRootNodes", mode = Mode.READ)
+    public Stream<RootNode> getRootNodes(@Name("url") String url,
+                                         @Name("startTimestamp") String startTimestamp,
+                                         @Name("endTimestamp") String endTimestamp) {
+
+        String[] queryFragments = new String[]{") \n WHERE apoc.date.fromISO8601(v.", Constants.versionProperty,
+                ") >= apoc.date.fromISO8601(\"", startTimestamp, "\") AND apoc.date.fromISO8601(v.",
+                Constants.versionProperty, ") <= apoc.date.fromISO8601(\"", endTimestamp,
+                "\")"};
+
+        return buildQueryandExecuteGetRootNodes(url, queryFragments).stream();
+    }
+
+    private ArrayList<RootNode> buildQueryandExecuteGetRootNodes(String url, String[] queryFragments) {
         ArrayList<RootNode> rootNodes = new ArrayList<>();
-
-        String[] queryFragments = new String[]{"MATCH (parent:", Constants.parentNodeLabel, "{", Constants.nameProperty,
-                ":\"", url, "\"})-[:", Constants.versionRelationshipType, "]->(v:",
-                Constants.versionNodeLabel, "{", Constants.versionProperty, ":\"", timestamp, "\"}) ",
-                 "RETURN parent.", Constants.nameProperty, ", v.", Constants.versionProperty, ", ID(v);"};
-
         StringBuilder queryBuilder = new StringBuilder("");
+        String[] matchFragments = {"MATCH (parent:", Constants.parentNodeLabel, "{", Constants.nameProperty,
+                ":\"", url, "\"})-[:", Constants.versionRelationshipType, "]->(v:",
+                Constants.versionNodeLabel,};
+        String[] returnFragments = {"\n RETURN parent.", Constants.nameProperty, ", v.",
+                Constants.versionProperty, ", ID(v);"};
         String query;
 
-        for (String fragment : queryFragments) {
+        List<String> queryFragmentsList;
+        queryFragmentsList = new ArrayList<>(Arrays.asList(matchFragments));
+        queryFragmentsList.addAll(Arrays.asList(queryFragments));
+        queryFragmentsList.addAll(Arrays.asList(returnFragments));
+
+        for (String fragment : queryFragmentsList) {
             queryBuilder.append(fragment);
         }
         query = queryBuilder.toString();
 
         Result result = db.beginTx().execute(query);
-        while(result.hasNext()){
+        while (result.hasNext()) {
             rootNodes.add(new RootNode(result.next()));
         }
-        return rootNodes.stream();
+        return rootNodes;
     }
 
     @Procedure(value = "linkserv.getOutlinkNodes", mode = Mode.READ)
@@ -57,7 +84,7 @@ public class ReadProcedures {
         query = queryBuilder.toString();
 
         Result result = db.beginTx().execute(query);
-        while(result.hasNext()){
+        while (result.hasNext()) {
             outlinkNodes.add(new OutlinkNode(result.next()));
         }
         return outlinkNodes.stream();
