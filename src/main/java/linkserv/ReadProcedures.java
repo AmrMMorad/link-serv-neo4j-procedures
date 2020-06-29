@@ -7,9 +7,9 @@ import org.neo4j.graphdb.Result;
 import org.neo4j.procedure.*;
 import constants.Constants;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.*;
 import java.util.stream.Stream;
 
 public class ReadProcedures {
@@ -30,14 +30,27 @@ public class ReadProcedures {
                                          @Name("startTimestamp") String startTimestamp,
                                          @Name("endTimestamp") String endTimestamp) {
 
-        String[] queryFragments = new String[]{") \n WHERE apoc.date.fromISO8601(v.", Constants.versionProperty,
-                ") >= apoc.date.fromISO8601(\"", startTimestamp, "\") AND apoc.date.fromISO8601(v.",
-                Constants.versionProperty, ") <= apoc.date.fromISO8601(\"", endTimestamp,
-                "\")"};
+        /*
+        The default values for start and end timestamps are based on the assumption
+        that we're currently only handling ISO8601 time format
+         */
 
+        startTimestamp = startTimestamp.isEmpty()? "0000-01-01T00:00:00Z" : startTimestamp;
+        endTimestamp = endTimestamp.isEmpty()? getCurrentTime() : endTimestamp;
+
+        String[] queryFragments = new String[]{") \n WHERE ", Constants.apocISOTimeFunction, "(v.", Constants.versionProperty,
+                ") >= ", Constants.apocISOTimeFunction, "(\"", startTimestamp, "\") AND ", Constants.apocISOTimeFunction,
+                "(v.", Constants.versionProperty, ") <= ", Constants.apocISOTimeFunction, "(\"", endTimestamp,
+                "\")"};
         return buildQueryandExecuteGetRootNodes(url, queryFragments).stream();
     }
 
+    private String getCurrentTime(){
+        TimeZone tz = TimeZone.getTimeZone("UTC");
+        DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'"); // Quoted "Z" to indicate UTC, no timezone offset
+        df.setTimeZone(tz);
+        return String.valueOf(df.format(new Date()));
+    }
     private ArrayList<RootNode> buildQueryandExecuteGetRootNodes(String url, String[] queryFragments) {
         ArrayList<RootNode> rootNodes = new ArrayList<>();
         StringBuilder queryBuilder = new StringBuilder("");
