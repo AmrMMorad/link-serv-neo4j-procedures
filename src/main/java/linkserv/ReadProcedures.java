@@ -21,8 +21,8 @@ public class ReadProcedures {
     public Stream<RootNode> getRootNode(@Name("url") String url,
                                         @Name("timestamp") String timestamp) {
 
-        String[] queryFragments = new String[]{"{", Constants.versionProperty, ":\"", timestamp, "\"})"};
-        return buildQueryandExecuteGetRootNodes(url, queryFragments).stream();
+        String[] queryFragments = new String[]{"WHERE v.", Constants.versionProperty, " = \"", timestamp, "\""};
+        return buildQueryandExecuteGetNodes(url, queryFragments, false).stream();
     }
 
     @Procedure(value = "linkserv.getRootNodes", mode = Mode.READ)
@@ -38,33 +38,44 @@ public class ReadProcedures {
         startTimestamp = startTimestamp.isEmpty()? "0000-01-01T00:00:00Z" : startTimestamp;
         endTimestamp = endTimestamp.isEmpty()? getCurrentTime() : endTimestamp;
 
-        String[] queryFragments = new String[]{") \n WHERE ", Constants.apocISOTimeFunction, "(v.", Constants.versionProperty,
+        String[] queryFragments = new String[]{"WHERE ", Constants.apocISOTimeFunction, "(v.", Constants.versionProperty,
                 ") >= ", Constants.apocISOTimeFunction, "(\"", startTimestamp, "\") AND ", Constants.apocISOTimeFunction,
                 "(v.", Constants.versionProperty, ") <= ", Constants.apocISOTimeFunction, "(\"", endTimestamp,
                 "\")"};
-        return buildQueryandExecuteGetRootNodes(url, queryFragments).stream();
+        return buildQueryandExecuteGetNodes(url, queryFragments, false).stream();
     }
 
-    private String getCurrentTime(){
-        TimeZone tz = TimeZone.getTimeZone("UTC");
-        DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'"); // Quoted "Z" to indicate UTC, no timezone offset
-        df.setTimeZone(tz);
-        return String.valueOf(df.format(new Date()));
+    @Procedure(value = "linkserv.getVersions", mode = Mode.READ)
+    public Stream<RootNode> getVersions(@Name("url") String url,
+                                        @Name("date") String date) {
+
+        String[] queryFragments = new String[]{ "WHERE v.", Constants.versionProperty, " STARTS WITH \"", date, "\""};
+        return buildQueryandExecuteGetNodes(url, queryFragments, false).stream();
     }
-    private ArrayList<RootNode> buildQueryandExecuteGetRootNodes(String url, String[] queryFragments) {
+
+    @Procedure(value = "linkserv.getLatestVersion", mode = Mode.READ)
+    public Stream<RootNode> getLatestVersion(@Name("url") String url){
+        String[] queryFragments = new String[]{""};
+        return buildQueryandExecuteGetNodes(url, queryFragments, true).stream();
+    }
+
+    private ArrayList<RootNode> buildQueryandExecuteGetNodes(String url, String[] queryFragments, boolean isGetLatestVersion) {
         ArrayList<RootNode> rootNodes = new ArrayList<>();
         StringBuilder queryBuilder = new StringBuilder("");
-        String[] matchFragments = {"MATCH (parent:", Constants.parentNodeLabel, "{", Constants.nameProperty,
+        String[] matchFragments = {"MATCH (n:", Constants.parentNodeLabel, "{", Constants.nameProperty,
                 ":\"", url, "\"})-[:", Constants.versionRelationshipType, "]->(v:",
-                Constants.versionNodeLabel,};
-        String[] returnFragments = {"\n RETURN parent.", Constants.nameProperty, ", v.",
-                Constants.versionProperty, ", ID(v);"};
+                Constants.versionNodeLabel, ")\n"};
+        String[] returnFragments = {"\n RETURN n.", Constants.nameProperty, ", v.",
+                Constants.versionProperty, ", ID(v)"};
+        String[] returnLatestVersionFragments = isGetLatestVersion ?
+                new String[]{" ORDER BY v.", Constants.versionProperty, " DESC LIMIT 1;"} : new String[]{";"};
         String query;
 
         List<String> queryFragmentsList;
         queryFragmentsList = new ArrayList<>(Arrays.asList(matchFragments));
         queryFragmentsList.addAll(Arrays.asList(queryFragments));
         queryFragmentsList.addAll(Arrays.asList(returnFragments));
+        queryFragmentsList.addAll(Arrays.asList(returnLatestVersionFragments));
 
         for (String fragment : queryFragmentsList) {
             queryBuilder.append(fragment);
@@ -76,6 +87,13 @@ public class ReadProcedures {
             rootNodes.add(new RootNode(result.next()));
         }
         return rootNodes;
+    }
+
+    private String getCurrentTime(){
+        TimeZone tz = TimeZone.getTimeZone("UTC");
+        DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'"); // Quoted "Z" to indicate UTC, no timezone offset
+        df.setTimeZone(tz);
+        return df.format(new Date());
     }
 
     @Procedure(value = "linkserv.getOutlinkNodes", mode = Mode.READ)
