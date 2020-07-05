@@ -1,5 +1,6 @@
 package linkserv;
 
+import models.HistogramEntry;
 import models.OutlinkNode;
 import models.RootNode;
 import org.neo4j.graphdb.GraphDatabaseService;
@@ -101,5 +102,57 @@ public class ReadProcedures {
             outlinkNodes.add(new OutlinkNode(result.next()));
         }
         return outlinkNodes.stream();
+    }
+
+    @Procedure(value = "linkserv.getVersionCountYearly", mode = Mode.READ)
+    public Stream<HistogramEntry> getVersionCountYearly(@Name("nodeName") String nodeName){
+
+        String[] queryFragments = new String[]{"MATCH (parent:", Constants.parentNodeLabel, "{", Constants.nameProperty,
+        ":\"", nodeName, "\"", "})-[:", Constants.versionRelationshipType, "]->(v:", Constants.versionNodeLabel,
+        ") RETURN DATETIME(v.", Constants.versionProperty, ").YEAR AS key, COUNT(v) AS count;"};
+
+        return getHistogramEntries(queryFragments);
+    }
+
+    @Procedure(value = "linkserv.getVersionCountMonthly", mode = Mode.READ)
+    public Stream<HistogramEntry> getVersionCountMonthly(@Name("nodeName") String nodeName, @Name("year") Number year){
+
+        String[] queryFragments = new String[]{"MATCH (parent:", Constants.parentNodeLabel, "{", Constants.nameProperty,
+                ":\"", nodeName, "\"", "})-[:", Constants.versionRelationshipType, "]->(v:", Constants.versionNodeLabel,
+                ") WHERE DATETIME(v.", Constants.versionProperty, ").YEAR=", String.valueOf(year),
+                " RETURN DATETIME(v.", Constants.versionProperty, ").MONTH AS key, COUNT(v) AS count;"};
+
+        return getHistogramEntries(queryFragments);
+    }
+
+    @Procedure(value = "linkserv.getVersionCountDaily", mode = Mode.READ)
+    public Stream<HistogramEntry> getVersionCountDaily(@Name("nodeName") String nodeName,
+                                                       @Name("year") Number year, @Name("month") Number month){
+
+        String[] queryFragments = new String[]{"MATCH (parent:", Constants.parentNodeLabel, "{", Constants.nameProperty,
+                ":\"", nodeName, "\"", "})-[:", Constants.versionRelationshipType, "]->(v:", Constants.versionNodeLabel,
+                ") WHERE DATETIME(v.", Constants.versionProperty, ").YEAR=", String.valueOf(year),
+                " AND DATETIME(v.", Constants.versionProperty, ").MONTH=", String.valueOf(month),
+                " RETURN DATETIME(v.", Constants.versionProperty, ").DAY AS key, COUNT(v) AS count;"};
+
+        return getHistogramEntries(queryFragments);
+    }
+
+    private Stream<HistogramEntry> getHistogramEntries(String [] queryFragments){
+
+        ArrayList<HistogramEntry> histogramEntries = new ArrayList<>();
+        StringBuilder queryBuilder = new StringBuilder("");
+        String query;
+
+        for (String fragment : queryFragments) {
+            queryBuilder.append(fragment);
+        }
+        query = queryBuilder.toString();
+
+        Result result = db.beginTx().execute(query);
+        while (result.hasNext()) {
+            histogramEntries.add(new HistogramEntry(result.next()));
+        }
+        return histogramEntries.stream();
     }
 }

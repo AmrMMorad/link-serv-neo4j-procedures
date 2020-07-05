@@ -55,7 +55,8 @@ public class WriteProcedures {
 
     private List addNodeWithItsVersion(String url, String timestamp){
         return  Arrays.asList("MERGE (parent:", Constants.parentNodeLabel,
-                " {", Constants.nameProperty, ":\"", url, "\"}) MERGE (version:", Constants.versionNodeLabel, " {", Constants.versionProperty,
+                " {", Constants.nameProperty, ":\"", url, "\"}) MERGE (parent)-[:", Constants.versionRelationshipType,
+                "]->(version:", Constants.versionNodeLabel, " {", Constants.versionProperty,
                 ":\"", timestamp, "\"}) MERGE (parent)-[:", Constants.versionRelationshipType, "]->(version)");
     }
 }
