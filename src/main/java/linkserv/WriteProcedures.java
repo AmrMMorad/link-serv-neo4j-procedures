@@ -26,11 +26,13 @@ public class WriteProcedures {
         List<String> queryFragmentsList;
 
         if(outlinks.size()!= 0) {
-            List unwindList = Arrays.asList("UNWIND $outlinks as row ");
+            List unwindList = Arrays.asList("UNWIND $outlinks AS row MATCH (c:Count) ");
             queryFragmentsList = new ArrayList<>(unwindList);
             queryFragmentsList.addAll(addNodeWithItsVersion(url, timestamp));
             queryFragmentsList.addAll(Arrays.asList(" MERGE (outlinks:", Constants.parentNodeLabel,
-                    " {", Constants.nameProperty, ":row.url}) MERGE (version)-[:", Constants.linkRelationshipType, "]->(outlinks) "));
+                    " {", Constants.nameProperty, ":row.url})" ," ON MATCH SET c.node_count=c.node_count+1",
+                    " MERGE (version)-[:", Constants.linkRelationshipType, "]->(outlinks)",
+                    " ON MATCH SET c.relationship_count=c.relationship_count+1  "));
         }
         else{
             queryFragmentsList = addNodeWithItsVersion(url, timestamp);
